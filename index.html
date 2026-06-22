@@ -16,25 +16,26 @@
 
   HOW TO USE IN WORDPRESS
   -----------------------
-  1. Edit a Page/Post -> add a "Custom HTML" block.
-  2. Paste the ENTIRE contents of this file into that block.
-     (Everything is self-contained: styles + script are inline; only
-      D3 / TopoJSON / the world map are loaded from a CDN.)
-  3. Publish. The widget sizes itself to the block width.
-
-  Alternatively, host this file and embed it with:
-     <iframe src="…/index.html" style="width:100%;height:640px;border:0"></iframe>
+  Because the student photos are bundled in assets/headshots/, the cleanest
+  install is to upload this folder and embed it as an iframe:
+  1. Upload the whole project folder (index.html + assets/) to your site,
+     e.g. /wp-content/uploads/lc-globe/  (via SFTP or a file manager plugin).
+  2. Add a "Custom HTML" block to the page and paste:
+       <iframe src="/wp-content/uploads/lc-globe/index.html"
+               style="width:100%;height:680px;border:0;border-radius:18px"
+               loading="lazy" title="LC2026 Globe"></iframe>
+  3. Publish. The widget sizes itself to the iframe width.
+  (You can also paste this whole file into a Custom HTML block, but then the
+   photo paths must point at where you uploaded assets/headshots/.)
 
   EDITING THE STUDENTS
   --------------------
-  Scroll down to the `STUDENTS` array (clearly marked below) and replace
-  the placeholder entries with the real 50 students. Each entry is:
-     { name: "Full Name", country: "India", image: "https://…/photo.jpg" }
+  Scroll to the `STUDENTS` array below. Each entry is:
+     { name: "Full Name", country: "India", image: "assets/headshots/xx.jpg" }
   - `country` must match a real country name. If a name doesn't light up,
     check the browser console — unmatched countries are logged with a hint,
     and you can add an alias in COUNTRY_ALIASES.
-  - `image` can be any URL (e.g. the photo URLs from the 360plus media
-    library). Leave it as "" to show initials instead.
+  - `image` can be a bundled path or any URL. Leave it "" to show initials.
 
   COLOURS
   -------
@@ -298,76 +299,61 @@
    Replace the placeholder entries below with the real 50 students.
    Format: { name: "Full Name", country: "Country", image: "https://…" }
    `image` may be "" to fall back to initials.
-   NOTE: These are PLACEHOLDER names based on the program's known
-   participating countries. Swap in the real roster + photo URLs.
+   This is the REAL 2026 cohort (51 participants), auto-extracted from the
+   official LC26 Bio & Headshot PDF. Photos live in assets/headshots/.
    ===================================================================== */
 const STUDENTS = [
-  // ---- India ----
-  { name: "Aarav Sharma",      country: "India",        image: "" },
-  { name: "Diya Patel",        country: "India",        image: "" },
-  { name: "Kabir Nair",        country: "India",        image: "" },
-  { name: "Anaya Reddy",       country: "India",        image: "" },
-  { name: "Vivaan Iyer",       country: "India",        image: "" },
-  { name: "Ishita Bose",       country: "India",        image: "" },
-  { name: "Rohan Mehta",       country: "India",        image: "" },
-  // ---- South Africa ----
-  { name: "Lerato Dlamini",    country: "South Africa", image: "" },
-  { name: "Sipho Khumalo",     country: "South Africa", image: "" },
-  { name: "Naledi Mokoena",    country: "South Africa", image: "" },
-  { name: "Thabo Nkosi",       country: "South Africa", image: "" },
-  { name: "Amara Botha",       country: "South Africa", image: "" },
-  // ---- Tanzania ----
-  { name: "Neema Juma",        country: "Tanzania",     image: "" },
-  { name: "Baraka Mushi",      country: "Tanzania",     image: "" },
-  { name: "Zawadi Maeda",      country: "Tanzania",     image: "" },
-  { name: "Jengo Mwakikagile", country: "Tanzania",     image: "" },
-  // ---- Madagascar ----
-  { name: "Hasina Rakoto",     country: "Madagascar",   image: "" },
-  { name: "Tiana Rabe",        country: "Madagascar",   image: "" },
-  { name: "Mamy Andry",        country: "Madagascar",   image: "" },
-  // ---- United States ----
-  { name: "Maya Thompson",     country: "United States", image: "" },
-  { name: "Ethan Rodriguez",   country: "United States", image: "" },
-  { name: "Olivia Carter",     country: "United States", image: "" },
-  { name: "Noah Williams",     country: "United States", image: "" },
-  { name: "Sofia Martinez",    country: "United States", image: "" },
-  // ---- Lebanon ----
-  { name: "Karim Haddad",      country: "Lebanon",      image: "" },
-  { name: "Layla Khoury",      country: "Lebanon",      image: "" },
-  { name: "Rami Aoun",         country: "Lebanon",      image: "" },
-  // ---- Nepal ----
-  { name: "Aarush Gurung",     country: "Nepal",        image: "" },
-  { name: "Sita Thapa",        country: "Nepal",        image: "" },
-  { name: "Bibek Shrestha",    country: "Nepal",        image: "" },
-  // ---- Kenya ----
-  { name: "Wanjiku Kamau",     country: "Kenya",        image: "" },
-  { name: "Otieno Odhiambo",   country: "Kenya",        image: "" },
-  { name: "Aisha Mwangi",      country: "Kenya",        image: "" },
-  // ---- Brazil ----
-  { name: "Lucas Oliveira",    country: "Brazil",       image: "" },
-  { name: "Camila Souza",      country: "Brazil",       image: "" },
-  { name: "Mateus Lima",       country: "Brazil",       image: "" },
-  // ---- United Kingdom ----
-  { name: "Amelia Clarke",     country: "United Kingdom", image: "" },
-  { name: "Oliver Bennett",    country: "United Kingdom", image: "" },
-  // ---- Philippines ----
-  { name: "Andrea Santos",     country: "Philippines",  image: "" },
-  { name: "Joshua Reyes",      country: "Philippines",  image: "" },
-  { name: "Bea Cruz",          country: "Philippines",  image: "" },
-  // ---- Indonesia ----
-  { name: "Putri Wijaya",      country: "Indonesia",    image: "" },
-  { name: "Eka Pratama",       country: "Indonesia",    image: "" },
-  // ---- Mexico ----
-  { name: "Valentina Cruz",    country: "Mexico",       image: "" },
-  { name: "Diego Hernández",   country: "Mexico",       image: "" },
-  // ---- Egypt ----
-  { name: "Nour Hassan",       country: "Egypt",        image: "" },
-  { name: "Omar Fahmy",        country: "Egypt",        image: "" },
-  // ---- Jordan ----
-  { name: "Yousef Al-Masri",   country: "Jordan",       image: "" },
-  // ---- Bangladesh ----
-  { name: "Tahmid Rahman",     country: "Bangladesh",   image: "" },
-  { name: "Nusrat Jahan",      country: "Bangladesh",   image: "" },
+  { name: "Mara Ann Stout", country: "USA", image: "assets/headshots/01-mara-ann-stout.jpg" },
+  { name: "Kajal Kumari", country: "India", image: "assets/headshots/02-kajal-kumari.jpg" },
+  { name: "Akshay", country: "India", image: "assets/headshots/03-akshay.jpg" },
+  { name: "Kyren Gonzalez", country: "USA", image: "assets/headshots/04-kyren-gonzalez.jpg" },
+  { name: "Sibongile Chitha", country: "South Africa", image: "assets/headshots/05-sibongile-chitha.jpg" },
+  { name: "Faith Faure", country: "South Africa", image: "assets/headshots/06-faith-faure.jpg" },
+  { name: "Humera Ali", country: "India", image: "assets/headshots/07-humera-ali.jpg" },
+  { name: "Olivia Mbroh Asemani", country: "Ghana", image: "assets/headshots/08-olivia-mbroh-asemani.jpg" },
+  { name: "Suhana Parvin", country: "India", image: "assets/headshots/09-suhana-parvin.jpg" },
+  { name: "Bunique", country: "South Africa", image: "assets/headshots/10-bunique.jpg" },
+  { name: "Vartika", country: "India", image: "assets/headshots/11-vartika.jpg" },
+  { name: "Karam Kassam Alhinnawi", country: "Syria", image: "assets/headshots/12-karam-kassam-alhinnawi.jpg" },
+  { name: "Yubil Bhattarai", country: "Nepal", image: "assets/headshots/13-yubil-bhattarai.jpg" },
+  { name: "Dhanush Kumar S.", country: "India", image: "assets/headshots/14-dhanush-kumar-s.jpg" },
+  { name: "Amay Gautam Kamble", country: "India", image: "assets/headshots/15-amay-gautam-kamble.jpg" },
+  { name: "Nanditha C", country: "India", image: "assets/headshots/16-nanditha-c.jpg" },
+  { name: "Md Peerbaksh", country: "India", image: "assets/headshots/17-md-peerbaksh.jpg" },
+  { name: "Bulelwa Mbokoma", country: "South Africa", image: "assets/headshots/18-bulelwa-mbokoma.jpg" },
+  { name: "Thabo Mnaphi", country: "South Africa", image: "assets/headshots/19-thabo-mnaphi.jpg" },
+  { name: "TOMBO Chamsira", country: "Madagascar", image: "assets/headshots/20-tombo-chamsira.jpg" },
+  { name: "Micah Provotorov", country: "Portugal", image: "assets/headshots/21-micah-provotorov.jpg" },
+  { name: "Ramadan Saya", country: "France", image: "assets/headshots/22-ramadan-saya.jpg" },
+  { name: "Jocelyn Woodridge", country: "USA", image: "assets/headshots/23-jocelyn-woodridge.jpg" },
+  { name: "Marquisha Santos", country: "Philippines", image: "assets/headshots/24-marquisha-santos.jpg" },
+  { name: "Jaya Sky Jaan", country: "USA", image: "assets/headshots/25-jaya-sky-jaan.jpg" },
+  { name: "Afrin Abdul Wahid Usmani", country: "India", image: "assets/headshots/26-afrin-abdul-wahid-usmani.jpg" },
+  { name: "Raíssa Alves da Costa Lima", country: "Brazil", image: "assets/headshots/27-raissa-alves-da-costa-lima.jpg" },
+  { name: "Abd El-Rahman Mousa", country: "Egypt", image: "assets/headshots/28-abd-el-rahman-mousa.jpg" },
+  { name: "Ziya Bhat", country: "India", image: "assets/headshots/29-ziya-bhat.jpg" },
+  { name: "Sophianna Hield", country: "USA", image: "assets/headshots/30-sophianna-hield.jpg" },
+  { name: "Marsha George", country: "USA", image: "assets/headshots/31-marsha-george.jpg" },
+  { name: "Alfred Mayen Lopez-Jimenez", country: "USA", image: "assets/headshots/32-alfred-mayen-lopez-jimenez.jpg" },
+  { name: "Ryan Chen", country: "USA", image: "assets/headshots/33-ryan-chen.jpg" },
+  { name: "Kimberly Estrada Romero", country: "USA", image: "assets/headshots/34-kimberly-estrada-romero.jpg" },
+  { name: "Paloma Mendez", country: "USA", image: "assets/headshots/35-paloma-mendez.jpg" },
+  { name: "Tulipaolo Ama", country: "USA", image: "assets/headshots/36-tulipaolo-ama.jpg" },
+  { name: "Christina Hendricks", country: "USA", image: "assets/headshots/37-christina-hendricks.jpg" },
+  { name: "Axel Erick Robledo", country: "USA", image: "assets/headshots/38-axel-erick-robledo.jpg" },
+  { name: "Arwa Ibrahim Kotb El Nagar", country: "Egypt", image: "assets/headshots/39-arwa-ibrahim-kotb-el-nagar.jpg" },
+  { name: "Mazen Kamel", country: "Egypt", image: "assets/headshots/40-mazen-kamel.jpg" },
+  { name: "Cielo Aymar Bustamante Cieza", country: "Peru", image: "assets/headshots/41-cielo-aymar-bustamante-cieza.jpg" },
+  { name: "Deki Lhamo", country: "Bhutan", image: "assets/headshots/42-deki-lhamo.jpg" },
+  { name: "Thinley Wangdi", country: "Bhutan", image: "assets/headshots/43-thinley-wangdi.jpg" },
+  { name: "Jonas Abel Gonçalves Garcia", country: "Brazil", image: "assets/headshots/44-jonas-abel-goncalves-garcia.jpg" },
+  { name: "Malathesha Gowda PP", country: "India", image: "assets/headshots/45-malathesha-gowda-pp.jpg" },
+  { name: "Corey Jeremiah Mikula", country: "USA", image: "assets/headshots/46-corey-jeremiah-mikula.jpg" },
+  { name: "Navjot Kaur", country: "India", image: "assets/headshots/47-navjot-kaur.jpg" },
+  { name: "Tharun Kumar", country: "India", image: "assets/headshots/48-tharun-kumar.jpg" },
+  { name: "Chikeluba Collins Chimaobi", country: "Nigeria", image: "assets/headshots/49-chikeluba-collins-chimaobi.jpg" },
+  { name: "Tupe Samiksha Sunil", country: "India", image: "assets/headshots/50-tupe-samiksha-sunil.jpg" },
+  { name: "Shubha A", country: "India", image: "assets/headshots/51-shubha-a.jpg" },
 ];
 /* =====================================================================
    ▲▲▲  END STUDENT DATA  ▲▲▲

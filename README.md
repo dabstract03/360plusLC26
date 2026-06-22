@@ -15,51 +15,54 @@ Palette is taken from the 360plus logo — **shades of green on black**.
 
 ## What's in here
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `index.html` | The entire widget — inline CSS + JS, self-contained. Open it directly to preview, or paste it into WordPress. |
+| `index.html` | The entire widget — inline CSS + JS, self-contained. Open it directly to preview. |
+| `assets/headshots/` | The 51 student headshots (square JPEGs), extracted from the official LC26 Bio & Headshot PDF. |
 
 The globe uses [D3](https://d3js.org/) (orthographic projection) + TopoJSON +
 the `world-atlas` country map, all loaded from a public CDN. No build step.
+
+**The real 2026 cohort is already loaded** — 51 participants across 15
+countries (India, USA, South Africa, Egypt, Brazil, Bhutan, Ghana, Syria,
+Nepal, Madagascar, Portugal, France, Philippines, Peru, Nigeria), each with
+their name and photo.
 
 ---
 
 ## Add it to WordPress
 
-**Option A — Custom HTML block (simplest)**
+Because the photos are bundled in `assets/headshots/`, the recommended install
+is **iframe + folder upload** (also isolates the widget from your theme CSS):
 
-1. Edit the *Leadership Collective 2026* page.
-2. Add a **Custom HTML** block.
-3. Open `index.html`, copy **everything** from `<style>` down through the
-   final `</script>` (or just paste the whole file — the `<!doctype>`/`<head>`
-   wrapper is harmless inside a block, but copying from `<style>` onward is
-   cleanest), and paste it into the block.
-4. **Preview**, then **Publish**. The widget fills the block's width and is
-   responsive.
-
-**Option B — iframe (keeps it fully isolated from theme CSS)**
-
-1. Upload `index.html` to your site (e.g. `/wp-content/uploads/lc-globe/index.html`)
-   via SFTP or the Media/File manager.
-2. In a Custom HTML block:
+1. Upload the whole project — `index.html` **and** the `assets/` folder — to
+   your site, e.g. `/wp-content/uploads/lc-globe/`, via SFTP or a file-manager
+   plugin (keep the folder structure intact).
+2. Edit the *Leadership Collective 2026* page → add a **Custom HTML** block →
+   paste:
    ```html
    <iframe src="/wp-content/uploads/lc-globe/index.html"
            style="width:100%;height:680px;border:0;border-radius:18px;"
            loading="lazy" title="Leadership Collective 2026 Globe"></iframe>
    ```
-   Option B is recommended if your theme's CSS interferes with the widget.
+3. **Preview**, then **Publish**. The widget fills the iframe width and is
+   responsive.
+
+> **Alternative (inline paste):** you can paste the whole `index.html` into a
+> Custom HTML block instead of using an iframe — but then the relative photo
+> paths (`assets/headshots/…`) must be made absolute to wherever you uploaded
+> the images (e.g. `https://360plus.org/wp-content/uploads/lc-globe/assets/headshots/…`).
+> The iframe route avoids this entirely.
 
 > **Networking note:** the widget loads D3 and the world map from
-> `cdn.jsdelivr.net`. That's fine on a normal live website. (During
-> development in this sandbox, outbound access to some hosts — including
-> `360plus.org` — was blocked by the environment's egress policy, which is why
-> the real student roster couldn't be auto-scraped; see below.)
+> `cdn.jsdelivr.net` — fine on a normal live website.
 
 ---
 
-## Add the real 50 students
+## Editing / updating the students
 
-Open `index.html` and find the block marked:
+The roster is already populated. To tweak it, open `index.html` and find the
+block marked:
 
 ```js
 /* ▼▼▼  STUDENT DATA — EDIT THIS  ▼▼▼ */
@@ -69,30 +72,21 @@ const STUDENTS = [ … ];
 Each student is one line:
 
 ```js
-{ name: "Full Name", country: "India", image: "https://360plus.org/.../photo.jpg" },
+{ name: "Full Name", country: "India", image: "assets/headshots/07-humera-ali.jpg" },
 ```
 
 - **`country`** must be a real country name. If a country doesn't light up,
   open the browser console — any unmatched country is logged with the exact
   fix (add an entry to `COUNTRY_ALIASES`, e.g. `"USA": "United States of America"`).
-- **`image`** is any photo URL (e.g. the student photos already in the 360plus
-  media library). Leave it `""` to show the student's initials instead.
+- **`image`** is a bundled path (`assets/headshots/…`) or any URL. Leave it
+  `""` to show the student's initials instead.
 - Multiple students from the same country are grouped automatically — the
   country's panel lists all of them.
 
-> The names currently in the file are **placeholders** spread across the
-> program's known participating countries (India, South Africa, Tanzania,
-> Madagascar, USA, Lebanon, Nepal, etc.). Replace them with the real roster.
-
-### Getting the exact data automatically
-
-The live page `https://360plus.org/leadership-collective-2026/` could not be
-fetched from the build sandbox because `360plus.org` is not in the
-environment's network allowlist. To have the real names/countries/photo URLs
-pulled in automatically, either:
-
-- add `360plus.org` to the environment's network egress allowlist, **or**
-- paste the 50 students (name + country + photo URL) and they'll be wired in.
+> The data was auto-extracted from `LC26_Bio_and_Headshot.pdf`. Note the PDF
+> contains **51** participants (one more than the "50" on the site — the extra
+> is **Deki Lhamo, Bhutan**, whose entry omits a comma in the source). Remove
+> a line here if the public count should read 50.
 
 ---
 
