@@ -17,13 +17,14 @@ Palette is taken from the 360plus logo — **shades of green on black**.
 
 | Path | Purpose |
 |------|---------|
-| `index.html` | The entire widget — inline CSS + JS, self-contained. Open it directly to preview. |
-| `assets/headshots/` | The 51 student headshots (square JPEGs), extracted from the official LC26 Bio & Headshot PDF. |
+| `index.html` | The full widget — inline CSS + JS. Photos referenced from `assets/headshots/`. Open directly to preview. |
+| `wordpress-embed.html` | **Paste-ready Custom HTML block.** Same widget but photos are embedded as data URIs, so it works with zero file uploads. |
+| `assets/headshots/` | The 50 student headshots (square JPEGs), extracted from the official LC26 Bio & Headshot PDF. |
 
 The globe uses [D3](https://d3js.org/) (orthographic projection) + TopoJSON +
 the `world-atlas` country map, all loaded from a public CDN. No build step.
 
-**The real 2026 cohort is already loaded** — 51 participants across 15
+**The real 2026 cohort is already loaded** — 50 participants across 15
 countries (India, USA, South Africa, Egypt, Brazil, Bhutan, Ghana, Syria,
 Nepal, Madagascar, Portugal, France, Philippines, Peru, Nigeria), each with
 their name and photo.
@@ -32,8 +33,16 @@ their name and photo.
 
 ## Add it to WordPress
 
-Because the photos are bundled in `assets/headshots/`, the recommended install
-is **iframe + folder upload** (also isolates the widget from your theme CSS):
+**Easiest — paste the ready-made block (no uploads):**
+
+1. Open `wordpress-embed.html` and copy its entire contents.
+2. Edit the *Leadership Collective 2026* page → add a **Custom HTML** block →
+   paste → **Publish**. Photos are embedded, so nothing else to host (only the
+   world map loads from a CDN).
+
+---
+
+**Alternative — iframe + folder upload** (lighter page, isolates theme CSS):
 
 1. Upload the whole project — `index.html` **and** the `assets/` folder — to
    your site, e.g. `/wp-content/uploads/lc-globe/`, via SFTP or a file-manager
@@ -83,10 +92,9 @@ Each student is one line:
 - Multiple students from the same country are grouped automatically — the
   country's panel lists all of them.
 
-> The data was auto-extracted from `LC26_Bio_and_Headshot.pdf`. Note the PDF
-> contains **51** participants (one more than the "50" on the site — the extra
-> is **Deki Lhamo, Bhutan**, whose entry omits a comma in the source). Remove
-> a line here if the public count should read 50.
+> The data was auto-extracted from `LC26_Bio_and_Headshot.pdf` — **50
+> participants**. (The PDF actually lists 51; Deki Lhamo, Bhutan was removed to
+> match the site's count of 50.)
 
 ---
 
