@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>360plus Leadership Collective 2026 — Globe</title>
+
+<!--
+  =====================================================================
+   360plus Leadership Collective 2026 — Interactive Globe
+  =====================================================================
+  A rotatable globe that highlights ONLY the countries the students come
+  from. Tap/click a highlighted country to reveal the students from that
+  country (name + photo). Works on desktop and mobile (drag to spin,
+  pinch is disabled to keep page scrolling clean, tap to select).
+
+  HOW TO USE IN WORDPRESS
+  -----------------------
+  1. Edit a Page/Post -> add a "Custom HTML" block.
+  2. Paste the ENTIRE contents of this file into that block.
+     (Everything is self-contained: styles + script are inline; only
+      D3 / TopoJSON / the world map are loaded from a CDN.)
+  3. Publish. The widget sizes itself to the block width.
+
+  Alternatively, host this file and embed it with:
+     <iframe src="…/index.html" style="width:100%;height:640px;border:0"></iframe>
+
+  EDITING THE STUDENTS
+  --------------------
+  Scroll down to the `STUDENTS` array (clearly marked below) and replace
+  the placeholder entries with the real 50 students. Each entry is:
+     { name: "Full Name", country: "India", image: "https://…/photo.jpg" }
+  - `country` must match a real country name. If a name doesn't light up,
+    check the browser console — unmatched countries are logged with a hint,
+    and you can add an alias in COUNTRY_ALIASES.
+  - `image` can be any URL (e.g. the photo URLs from the 360plus media
+    library). Leave it as "" to show initials instead.
+
+  COLOURS
+  -------
+  The palette (shades of green + black, from the 360plus logo) lives in the
+  CSS `:root` variables below. Tweak `--lc-green*` to match the exact brand
+  hex once you have it.
+  =====================================================================
+-->
+
+<style>
+  :root {
+    /* ---- 360plus palette: shades of green + black ---- */
+    --lc-black:        #0a0d0b;   /* page / ocean backdrop          */
+    --lc-ocean:        #0e1512;   /* the sphere (sea)               */
+    --lc-land:         #1d2a22;   /* countries with NO students     */
+    --lc-land-stroke:  #0a0f0c;   /* country borders                */
+    --lc-green:        #4caf50;   /* highlighted student country    */
+    --lc-green-deep:   #2f7d32;   /* highlight gradient / shading   */
+    --lc-green-bright: #8dc63f;   /* hover / active highlight       */
+    --lc-graticule:    rgba(141,198,63,0.10);
+    --lc-text:         #eafff0;
+    --lc-text-dim:     #9fb7a6;
+    --lc-card:         rgba(20,30,24,0.92);
+    --lc-card-border:  rgba(141,198,63,0.25);
+  }
+
+  .lc-globe-app, .lc-globe-app * { box-sizing: border-box; }
+
+  .lc-globe-app {
+    --panel-w: 340px;
+    position: relative;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: 560px;
+    display: flex;
+    gap: 18px;
+    align-items: stretch;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--lc-text);
+    background:
+      radial-gradient(120% 90% at 50% 0%, #11201a 0%, var(--lc-black) 60%, #050806 100%);
+    border-radius: 18px;
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  /* ---- Globe stage ---- */
+  .lc-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .lc-header { padding: 4px 6px 12px; }
+  .lc-header h2 {
+    margin: 0;
+    font-size: clamp(18px, 2.4vw, 26px);
+    font-weight: 800;
+    letter-spacing: .2px;
+  }
+  .lc-header h2 .lc-accent { color: var(--lc-green-bright); }
+  .lc-header p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--lc-text-dim);
+  }
+
+  .lc-canvas-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lc-canvas-wrap canvas {
+    display: block;
+    touch-action: pan-y;
+    cursor: grab;
+    width: 100%;
+    height: 100%;
+  }
+  .lc-canvas-wrap canvas:active { cursor: grabbing; }
+
+  .lc-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--lc-card);
+    border: 1px solid var(--lc-card-border);
+    color: var(--lc-text);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    opacity: 0;
+    transition: opacity .12s ease;
+    z-index: 5;
+  }
+  .lc-tooltip.show { opacity: 1; }
+  .lc-tooltip small { display:block; color: var(--lc-text-dim); font-weight:500; }
+
+  .lc-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--lc-text-dim); font-size: 14px;
+    gap: 10px;
+  }
+  .lc-spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid rgba(141,198,63,.25);
+    border-top-color: var(--lc-green-bright);
+    animation: lc-spin .8s linear infinite;
+  }
+  @keyframes lc-spin { to { transform: rotate(360deg); } }
+
+  /* ---- Country chips ---- */
+  .lc-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 6px 2px;
+  }
+  .lc-chip {
+    appearance: none; border: 1px solid var(--lc-card-border);
+    background: rgba(76,175,80,0.10); color: var(--lc-text);
+    font-size: 12px; font-weight: 600;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, transform .05s ease;
+  }
+  .lc-chip:hover { background: rgba(141,198,63,0.22); border-color: var(--lc-green-bright); }
+  .lc-chip:active { transform: scale(.96); }
+  .lc-chip .lc-dot {
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    background: var(--lc-green-bright); margin-right:6px; vertical-align: middle;
+  }
+  .lc-chip .lc-count {
+    color: var(--lc-text-dim); font-weight: 500; margin-left: 4px;
+  }
+
+  /* ---- Side panel ---- */
+  .lc-panel {
+    flex: 0 0 var(--panel-w);
+    width: var(--panel-w);
+    background: var(--lc-card);
+    border: 1px solid var(--lc-card-border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex; flex-direction: column;
+    transition: transform .25s ease;
+  }
+  .lc-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 12px;
+  }
+  .lc-panel-head h3 { margin: 0; font-size: 18px; font-weight: 800; }
+  .lc-panel-head .lc-sub { font-size: 12px; color: var(--lc-text-dim); margin-top:2px; }
+  .lc-close {
+    appearance:none; border:0; background: rgba(255,255,255,0.06);
+    color: var(--lc-text); width: 30px; height: 30px; border-radius: 8px;
+    font-size: 18px; line-height: 1; cursor: pointer; display:none;
+  }
+  .lc-close:hover { background: rgba(255,255,255,0.12); }
+
+  .lc-students {
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding-right: 4px;
+  }
+  .lc-student {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(141,198,63,0.12);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+  .lc-avatar {
+    width: 100%; aspect-ratio: 1/1; border-radius: 10px;
+    object-fit: cover; background: linear-gradient(135deg, var(--lc-green-deep), var(--lc-green));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 22px; overflow: hidden;
+  }
+  .lc-avatar img { width:100%; height:100%; object-fit: cover; display:block; }
+  .lc-student .lc-name { margin-top: 8px; font-size: 13px; font-weight: 600; line-height:1.25; }
+
+  .lc-empty {
+    color: var(--lc-text-dim); font-size: 13px; text-align:center;
+    margin: auto; padding: 24px 8px;
+  }
+  .lc-empty strong { display:block; color: var(--lc-text); margin-bottom:6px; font-size:15px; }
+
+  .lc-stat {
+    display:flex; gap: 16px; padding: 2px 6px 0; color: var(--lc-text-dim); font-size: 12px;
+  }
+  .lc-stat b { color: var(--lc-green-bright); font-weight: 800; }
+
+  /* ---- Mobile ---- */
+  @media (max-width: 760px) {
+    .lc-globe-app { flex-direction: column; padding: 14px; min-height: 0; }
+    .lc-panel {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      width: 100%; flex-basis: auto;
+      max-height: 62vh;
+      border-radius: 18px 18px 0 0;
+      transform: translateY(110%);
+      z-index: 40;
+      box-shadow: 0 -10px 40px rgba(0,0,0,.5);
+    }
+    .lc-panel.open { transform: translateY(0); }
+    .lc-close { display: inline-flex; align-items:center; justify-content:center; }
+    .lc-students { grid-template-columns: repeat(3, 1fr); }
+    .lc-canvas-wrap { min-height: 300px; height: 56vw; max-height: 420px; }
+  }
+</style>
+</head>
+<body style="margin:0;background:#050806;">
+
+<div class="lc-globe-app" id="lcApp">
+  <div class="lc-stage">
+    <div class="lc-header">
+      <h2>360plus <span class="lc-accent">Leadership Collective 2026</span></h2>
+      <p>Spin the globe and tap a highlighted country to meet the students from there.</p>
+    </div>
+
+    <div class="lc-canvas-wrap" id="lcCanvasWrap">
+      <canvas id="lcCanvas"></canvas>
+      <div class="lc-tooltip" id="lcTooltip"></div>
+      <div class="lc-loading" id="lcLoading"><span class="lc-spinner"></span> Loading globe…</div>
+    </div>
+
+    <div class="lc-stat" id="lcStat"></div>
+    <div class="lc-chips" id="lcChips"></div>
+  </div>
+
+  <aside class="lc-panel" id="lcPanel">
+    <div class="lc-panel-head">
+      <div>
+        <h3 id="lcPanelTitle">Welcome</h3>
+        <div class="lc-sub" id="lcPanelSub">Select a highlighted country</div>
+      </div>
+      <button class="lc-close" id="lcClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="lc-students" id="lcStudents"></div>
+    <div class="lc-empty" id="lcEmpty">
+      <strong>Tap a glowing country</strong>
+      The green countries are home to our 2026 cohort. Click one to see the students.
+    </div>
+  </aside>
+</div>
+
+<!-- D3 + TopoJSON + world map (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+
+<script>
+/* =====================================================================
+   ▼▼▼  STUDENT DATA — EDIT THIS  ▼▼▼
+   Replace the placeholder entries below with the real 50 students.
+   Format: { name: "Full Name", country: "Country", image: "https://…" }
+   `image` may be "" to fall back to initials.
+   NOTE: These are PLACEHOLDER names based on the program's known
+   participating countries. Swap in the real roster + photo URLs.
+   ===================================================================== */
+const STUDENTS = [
+  // ---- India ----
+  { name: "Aarav Sharma",      country: "India",        image: "" },
+  { name: "Diya Patel",        country: "India",        image: "" },
+  { name: "Kabir Nair",        country: "India",        image: "" },
+  { name: "Anaya Reddy",       country: "India",        image: "" },
+  { name: "Vivaan Iyer",       country: "India",        image: "" },
+  { name: "Ishita Bose",       country: "India",        image: "" },
+  { name: "Rohan Mehta",       country: "India",        image: "" },
+  // ---- South Africa ----
+  { name: "Lerato Dlamini",    country: "South Africa", image: "" },
+  { name: "Sipho Khumalo",     country: "South Africa", image: "" },
+  { name: "Naledi Mokoena",    country: "South Africa", image: "" },
+  { name: "Thabo Nkosi",       country: "South Africa", image: "" },
+  { name: "Amara Botha",       country: "South Africa", image: "" },
+  // ---- Tanzania ----
+  { name: "Neema Juma",        country: "Tanzania",     image: "" },
+  { name: "Baraka Mushi",      country: "Tanzania",     image: "" },
+  { name: "Zawadi Maeda",      country: "Tanzania",     image: "" },
+  { name: "Jengo Mwakikagile", country: "Tanzania",     image: "" },
+  // ---- Madagascar ----
+  { name: "Hasina Rakoto",     country: "Madagascar",   image: "" },
+  { name: "Tiana Rabe",        country: "Madagascar",   image: "" },
+  { name: "Mamy Andry",        country: "Madagascar",   image: "" },
+  // ---- United States ----
+  { name: "Maya Thompson",     country: "United States", image: "" },
+  { name: "Ethan Rodriguez",   country: "United States", image: "" },
+  { name: "Olivia Carter",     country: "United States", image: "" },
+  { name: "Noah Williams",     country: "United States", image: "" },
+  { name: "Sofia Martinez",    country: "United States", image: "" },
+  // ---- Lebanon ----
+  { name: "Karim Haddad",      country: "Lebanon",      image: "" },
+  { name: "Layla Khoury",      country: "Lebanon",      image: "" },
+  { name: "Rami Aoun",         country: "Lebanon",      image: "" },
+  // ---- Nepal ----
+  { name: "Aarush Gurung",     country: "Nepal",        image: "" },
+  { name: "Sita Thapa",        country: "Nepal",        image: "" },
+  { name: "Bibek Shrestha",    country: "Nepal",        image: "" },
+  // ---- Kenya ----
+  { name: "Wanjiku Kamau",     country: "Kenya",        image: "" },
+  { name: "Otieno Odhiambo",   country: "Kenya",        image: "" },
+  { name: "Aisha Mwangi",      country: "Kenya",        image: "" },
+  // ---- Brazil ----
+  { name: "Lucas Oliveira",    country: "Brazil",       image: "" },
+  { name: "Camila Souza",      country: "Brazil",       image: "" },
+  { name: "Mateus Lima",       country: "Brazil",       image: "" },
+  // ---- United Kingdom ----
+  { name: "Amelia Clarke",     country: "United Kingdom", image: "" },
+  { name: "Oliver Bennett",    country: "United Kingdom", image: "" },
+  // ---- Philippines ----
+  { name: "Andrea Santos",     country: "Philippines",  image: "" },
+  { name: "Joshua Reyes",      country: "Philippines",  image: "" },
+  { name: "Bea Cruz",          country: "Philippines",  image: "" },
+  // ---- Indonesia ----
+  { name: "Putri Wijaya",      country: "Indonesia",    image: "" },
+  { name: "Eka Pratama",       country: "Indonesia",    image: "" },
+  // ---- Mexico ----
+  { name: "Valentina Cruz",    country: "Mexico",       image: "" },
+  { name: "Diego Hernández",   country: "Mexico",       image: "" },
+  // ---- Egypt ----
+  { name: "Nour Hassan",       country: "Egypt",        image: "" },
+  { name: "Omar Fahmy",        country: "Egypt",        image: "" },
+  // ---- Jordan ----
+  { name: "Yousef Al-Masri",   country: "Jordan",       image: "" },
+  // ---- Bangladesh ----
+  { name: "Tahmid Rahman",     country: "Bangladesh",   image: "" },
+  { name: "Nusrat Jahan",      country: "Bangladesh",   image: "" },
+];
+/* =====================================================================
+   ▲▲▲  END STUDENT DATA  ▲▲▲
+   ===================================================================== */
+
+/* Aliases map student country names -> the names used by the world atlas
+   (Natural Earth). Add here if a country fails to highlight. */
+const COUNTRY_ALIASES = {
+  "United States":        "United States of America",
+  "USA":                  "United States of America",
+  "UK":                   "United Kingdom",
+  "Tanzania":             "United Republic of Tanzania",
+  "DRC":                  "Democratic Republic of the Congo",
+  "Congo":                "Republic of the Congo",
+  "Ivory Coast":          "Côte d'Ivoire",
+  "South Korea":          "South Korea",
+  "Russia":               "Russia",
+  "Czech Republic":       "Czechia",
+};
+
+(function () {
+  "use strict";
+
+  const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+  // --- DOM ---
+  const app       = document.getElementById("lcApp");
+  const wrap       = document.getElementById("lcCanvasWrap");
+  const canvas     = document.getElementById("lcCanvas");
+  const tooltip    = document.getElementById("lcTooltip");
+  const loadingEl  = document.getElementById("lcLoading");
+  const panel      = document.getElementById("lcPanel");
+  const panelTitle = document.getElementById("lcPanelTitle");
+  const panelSub   = document.getElementById("lcPanelSub");
+  const studentsEl = document.getElementById("lcStudents");
+  const emptyEl    = document.getElementById("lcEmpty");
+  const chipsEl    = document.getElementById("lcChips");
+  const statEl     = document.getElementById("lcStat");
+  const closeBtn   = document.getElementById("lcClose");
+
+  const ctx = canvas.getContext("2d");
+  const norm = (s) => (s || "").trim().toLowerCase();
+
+  // --- Build country -> students map ---
+  const studentsByCountry = new Map();   // key = normalised atlas name
+  const displayName = new Map();          // normalised -> atlas display name
+  STUDENTS.forEach((s) => {
+    const atlasName = COUNTRY_ALIASES[s.country] || s.country;
+    const key = norm(atlasName);
+    if (!studentsByCountry.has(key)) studentsByCountry.set(key, []);
+    studentsByCountry.get(key).push(s);
+    displayName.set(key, atlasName);
+  });
+
+  let projection, path, countries, highlighted = [], rotation = [0, -10, 0];
+  let scale = 1, cx = 0, cy = 0, width = 0, height = 0, dpr = 1;
+  let hovered = null, selectedKey = null, autoRotate = true, lastT = 0;
+
+  function resize() {
+    const r = wrap.getBoundingClientRect();
+    width = Math.max(280, r.width);
+    height = Math.max(280, r.height);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = width / 2; cy = height / 2;
+    scale = Math.min(width, height) / 2 - 6;
+    if (projection) {
+      projection.scale(scale).translate([cx, cy]);
+      render();
+    }
+  }
+
+  function render() {
+    if (!countries) return;
+    ctx.clearRect(0, 0, width, height);
+
+    // Ocean sphere
+    ctx.beginPath();
+    path({ type: "Sphere" });
+    const grad = ctx.createRadialGradient(cx - scale*0.3, cy - scale*0.35, scale*0.2, cx, cy, scale*1.15);
+    grad.addColorStop(0, "#16221c");
+    grad.addColorStop(1, getCss("--lc-ocean"));
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Graticule
+    ctx.beginPath();
+    path(d3.geoGraticule10());
+    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = getCss("--lc-graticule");
+    ctx.stroke();
+
+    // Base land
+    ctx.beginPath();
+    path(countries);
+    ctx.fillStyle = getCss("--lc-land");
+    ctx.fill();
+    ctx.lineWidth = 0.4;
+    ctx.strokeStyle = getCss("--lc-land-stroke");
+    ctx.stroke();
+
+    // Highlighted countries
+    highlighted.forEach((f) => {
+      const isHover = hovered && hovered.__key === f.__key;
+      const isSel   = selectedKey === f.__key;
+      ctx.beginPath();
+      path(f);
+      ctx.fillStyle = (isHover || isSel) ? getCss("--lc-green-bright") : getCss("--lc-green");
+      ctx.fill();
+      ctx.lineWidth = isSel ? 1.4 : 0.8;
+      ctx.strokeStyle = getCss("--lc-green-deep");
+      ctx.stroke();
+    });
+
+    // Front rim
+    ctx.beginPath();
+    path({ type: "Sphere" });
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(141,198,63,0.25)";
+    ctx.stroke();
+  }
+
+  const cssCache = {};
+  function getCss(v) {
+    if (!(v in cssCache))
+      cssCache[v] = getComputedStyle(app).getPropertyValue(v).trim() || "#000";
+    return cssCache[v];
+  }
+
+  // --- Interaction ---
+  function pointerToCountry(px, py) {
+    const geo = projection.invert([px, py]);
+    if (!geo) return null;
+    for (const f of highlighted) {
+      if (d3.geoContains(f, geo)) return f;
+    }
+    return null;
+  }
+
+  function setupDrag() {
+    let dragging = false, moved = false, lx = 0, ly = 0, downX = 0, downY = 0;
+    const sens = 0.25;
+
+    function down(e) {
+      dragging = true; moved = false; autoRotate = false;
+      const p = pt(e); lx = downX = p.x; ly = downY = p.y;
+      canvas.setPointerCapture && e.pointerId != null && canvas.setPointerCapture(e.pointerId);
+    }
+    function move(e) {
+      const p = pt(e);
+      if (dragging) {
+        const dx = p.x - lx, dy = p.y - ly;
+        lx = p.x; ly = p.y;
+        if (Math.abs(p.x - downX) + Math.abs(p.y - downY) > 4) moved = true;
+        rotation[0] += dx * (sens * 75 / scale);
+        rotation[1] -= dy * (sens * 75 / scale);
+        rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
+        projection.rotate(rotation);
+        render();
+      } else {
+        // hover (desktop)
+        const f = pointerToCountry(p.x, p.y);
+        if ((f && f.__key) !== (hovered && hovered.__key)) {
+          hovered = f; render();
+        }
+        if (f) {
+          const list = studentsByCountry.get(f.__key) || [];
+          showTooltip(p.x, p.y, displayName.get(f.__key) || f.properties.name, list.length);
+          canvas.style.cursor = "pointer";
+        } else {
+          hideTooltip(); canvas.style.cursor = "grab";
+        }
+      }
+    }
+    function up(e) {
+      if (dragging && !moved) {
+        const p = pt(e);
+        const f = pointerToCountry(p.x, p.y);
+        if (f) selectCountry(f.__key, false);
+      }
+      dragging = false;
+      setTimeout(() => { if (!selectedKey) autoRotate = true; }, 4000);
+    }
+    function pt(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    canvas.addEventListener("pointerleave", () => { hideTooltip(); if (hovered) { hovered = null; render(); } });
+  }
+
+  function showTooltip(x, y, name, count) {
+    tooltip.innerHTML = name + "<small>" + count + " student" + (count === 1 ? "" : "s") + "</small>";
+    tooltip.style.left = x + "px";
+    tooltip.style.top = y + "px";
+    tooltip.classList.add("show");
+  }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+
+  // --- Rotate-to + select ---
+  function rotateTo(target, cb) {
+    const start = projection.rotate();
+    const iv = d3.interpolate(start, target);
+    const t0 = performance.now();
+    autoRotate = false;
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / 700);
+      const e = d3.easeCubicInOut(k);
+      rotation = iv(e);
+      projection.rotate(rotation);
+      render();
+      if (k < 1) requestAnimationFrame(step);
+      else if (cb) cb();
+    })(t0);
+  }
+
+  function selectCountry(key, recenter) {
+    const f = highlighted.find((x) => x.__key === key);
+    if (!f) return;
+    selectedKey = key;
+    autoRotate = false;
+    hideTooltip();
+    if (recenter) {
+      const c = d3.geoCentroid(f);
+      rotateTo([-c[0], -c[1], 0], render);
+    } else {
+      render();
+    }
+    renderPanel(key);
+  }
+
+  function renderPanel(key) {
+    const list = studentsByCountry.get(key) || [];
+    const cname = displayName.get(key) || "";
+    panelTitle.textContent = cname;
+    panelSub.textContent = list.length + " student" + (list.length === 1 ? "" : "s") + " from " + cname;
+    emptyEl.style.display = "none";
+    studentsEl.style.display = "grid";
+    studentsEl.innerHTML = list.map((s) => {
+      const initials = s.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+      const avatar = s.image
+        ? `<div class="lc-avatar"><img src="${esc(s.image)}" alt="${esc(s.name)}" loading="lazy" onerror="this.parentNode.textContent='${initials}'"></div>`
+        : `<div class="lc-avatar">${initials}</div>`;
+      return `<div class="lc-student">${avatar}<div class="lc-name">${esc(s.name)}</div></div>`;
+    }).join("");
+    panel.classList.add("open");
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function closePanel() {
+    panel.classList.remove("open");
+    selectedKey = null;
+    studentsEl.style.display = "none";
+    emptyEl.style.display = "block";
+    panelTitle.textContent = "Welcome";
+    panelSub.textContent = "Select a highlighted country";
+    render();
+    setTimeout(() => { autoRotate = true; }, 1500);
+  }
+  closeBtn.addEventListener("click", closePanel);
+
+  function buildChips() {
+    const keys = [...studentsByCountry.keys()]
+      .filter((k) => highlighted.some((f) => f.__key === k))
+      .sort((a, b) => displayName.get(a).localeCompare(displayName.get(b)));
+    chipsEl.innerHTML = "";
+    keys.forEach((k) => {
+      const btn = document.createElement("button");
+      btn.className = "lc-chip";
+      btn.innerHTML = `<span class="lc-dot"></span>${esc(displayName.get(k))}<span class="lc-count">${studentsByCountry.get(k).length}</span>`;
+      btn.addEventListener("click", () => selectCountry(k, true));
+      chipsEl.appendChild(btn);
+    });
+    const totalStudents = STUDENTS.length;
+    statEl.innerHTML = `<span><b>${totalStudents}</b> students</span><span><b>${keys.length}</b> countries</span>`;
+  }
+
+  function tick(t) {
+    if (autoRotate && !document.hidden) {
+      const dt = lastT ? (t - lastT) : 16;
+      rotation[0] += dt * 0.006;
+      projection.rotate(rotation);
+      render();
+    }
+    lastT = t;
+    requestAnimationFrame(tick);
+  }
+
+  // --- Boot ---
+  d3.json(WORLD_URL).then((world) => {
+    countries = topojson.feature(world, world.objects.countries);
+
+    // Attach normalised key + resolve highlighted set
+    const wanted = new Set(studentsByCountry.keys());
+    const matched = new Set();
+    countries.features.forEach((f) => {
+      f.__key = norm(f.properties.name);
+      if (wanted.has(f.__key)) {
+        highlighted.push(f);
+        matched.add(f.__key);
+        // ensure displayName reflects atlas spelling
+        displayName.set(f.__key, f.properties.name);
+      }
+    });
+
+    // Warn about countries that didn't match any atlas feature
+    wanted.forEach((k) => {
+      if (!matched.has(k)) {
+        console.warn(
+          `[360plus globe] Country "${displayName.get(k)}" did not match the world map. ` +
+          `Add an alias in COUNTRY_ALIASES (atlas spelling). Students affected: ` +
+          (studentsByCountry.get(k) || []).map((s) => s.name).join(", ")
+        );
+      }
+    });
+
+    projection = d3.geoOrthographic()
+      .rotate(rotation)
+      .clipAngle(90)
+      .precision(0.4);
+    path = d3.geoPath(projection, ctx);
+
+    resize();
+    buildChips();
+    loadingEl.style.display = "none";
+    setupDrag();
+    requestAnimationFrame(tick);
+  }).catch((err) => {
+    loadingEl.innerHTML = "Could not load the world map. Check your connection / CDN access.";
+    console.error("[360plus globe] world map load failed:", err);
+  });
+
+  // Resize handling
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => resize()).observe(wrap);
+  } else {
+    window.addEventListener("resize", resize);
+  }
+})();
+</script>
+</body>
+</html>
